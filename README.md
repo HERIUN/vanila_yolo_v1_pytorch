@@ -1,5 +1,6 @@
 # vanila_yolo_v1_pytorch
 
+https://blog.naver.com/ehdrndd/222382745254
 
 ## TODO
 
