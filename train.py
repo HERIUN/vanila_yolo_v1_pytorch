@@ -19,7 +19,7 @@ classes = ['person', # Person
 
 # annot_dir = '/home/lee/workspace/yolo_v1_pytorch/VOCdevkit/VOC2012/Annotations'
 
-image_dir = '/home/lee/workspace/yolo_v1_pytorch/VOCdevkit/VOC2012/JPEGImages'
+image_dir = '/home/lee/workspace/yolo_v1_pytorch/VOC2012/JPEGImages'
 label_txt = '/home/lee/workspace/yolo_v1_pytorch/voc2012.txt'
 # convert_annot_dir = '/home/lee/workspace/yolo_v1_pytorch/voc_to_yolo '
 # class_names_file_dir = '/home/lee/workspace/yolo_v1_pytorch/voc.names'

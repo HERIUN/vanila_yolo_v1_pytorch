@@ -1,4 +1,5 @@
 import torch
+from torch.nn.functional import cosine_embedding_loss
 from torch.utils.data import Dataset
 import torchvision.transforms as transforms
 
@@ -49,24 +50,26 @@ class VOCDataset(Dataset):
 
     def __getitem__(self, idx):
         path = self.img_paths[idx]
-        img = cv2.imread(path)
+        img = cv2.imread(path) # (h, w, 3). 3 = (B,G,R)
         boxes = self.boxes[idx].clone() # [n, 4] ex. tensor([[x1, y1, x2, y2]_obj1])
         labels = self.labels[idx].clone() # [n,]
 
         img, boxes = self.random_scale(img,boxes)
         img, boxes, labels = self.random_translation(img, boxes, labels)
+        img = self.random_exposure(img)
+        img = self.random_saturation(img)
 
         # For debug.
-        # debug_dir = 'tmp/voc_tta'
-        # os.makedirs(debug_dir, exist_ok=True)
-        # img_show = img.copy()
-        # box_show = boxes.numpy().reshape(-1)
-        # n = len(box_show) // 4
-        # for b in range(n):
-        #     pt1 = (int(box_show[4*b + 0]), int(box_show[4*b + 1]))
-        #     pt2 = (int(box_show[4*b + 2]), int(box_show[4*b + 3]))
-        #     cv2.rectangle(img_show, pt1=pt1, pt2=pt2, color=(0,255,0), thickness=1)
-        # cv2.imwrite(os.path.join(debug_dir, 'test_{}.jpg'.format(idx)), img_show)
+        debug_dir = 'tmp/voc_tta'
+        os.makedirs(debug_dir, exist_ok=True)
+        img_show = img.copy()
+        box_show = boxes.numpy().reshape(-1)
+        n = len(box_show) // 4
+        for b in range(n):
+            pt1 = (int(box_show[4*b + 0]), int(box_show[4*b + 1]))
+            pt2 = (int(box_show[4*b + 2]), int(box_show[4*b + 3]))
+            cv2.rectangle(img_show, pt1=pt1, pt2=pt2, color=(0,255,0), thickness=1)
+        cv2.imwrite(os.path.join(debug_dir, 'test_{}.jpg'.format(idx)), img_show)
 
         h, w, _ = img.shape
         boxes /= torch.Tensor([[w,h,w,h]])#.expand_as(boxes) # normalize(x1,y1,x2,y2) w.r.t. image width,height
@@ -103,7 +106,7 @@ class VOCDataset(Dataset):
             xy_normalized_grid = (xy - x0y0) / cell_size # 해당 그리드의 넓이,높이를 1로 쳤을때, center x,y의 좌표(0~1)
             for k in range(B):
                 target[i, j, 5*k   : 5*k+2] = xy_normalized_grid
-                target[i, j, 5*k+2 : 5*k+4] = wh # check paper 2.Unified Detection 4th paragraph
+                target[i, j, 5*k+2 : 5*k+4] = wh # check paper section 2.Unified Detection, 4th paragraph
                 target[i, j, 5*k+4        ] = 1.0 # confidence score. 물체가 있을 확률(Pr(Obj)) * IOU_truth/pred
             target[i, j, 5*B + label      ] = 1.0 # class probability. Pr(Class_i|Object)
 
@@ -123,6 +126,9 @@ class VOCDataset(Dataset):
         return img, boxes
 
     def random_translation(self, img, boxes, labels):
+        """
+            이미지를 가로,세로 최대 20%까지 평행이동. 만약 박스가 이미지 밖으로 나갈 경우, 이미지의 끝에 맞춰짐.
+        """
         if random.random() < 0.5:
             return img, boxes, labels
         
@@ -164,16 +170,45 @@ class VOCDataset(Dataset):
 
         return img_out, boxes_out, labels_out
 
+    def random_exposure(self, bgr):
+        """
+            same as random_brightness
+        """
+        if random.random() < 0.5:
+            return bgr
 
+        hsv = cv2.cvtColor(bgr, cv2.COLOR_BGR2HSV)
+        h, s, v = cv2.split(hsv)
+        adjust = random.uniform(0.5, 1.5)
+        v = v * adjust
+        v = np.clip(v, 0, 255).astype(hsv.dtype)
+        hsv = cv2.merge((h, s, v))
+        bgr = cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)
 
+        return bgr
+        
+    def random_saturation(self, bgr):
+        """
+            채도 조절
+        """
+        if random.random() < 0.5:
+            return bgr
 
+        hsv = cv2.cvtColor(bgr, cv2.COLOR_BGR2HSV)
+        h, s, v = cv2.split(hsv)
+        adjust = random.uniform(0.5, 1.5)
+        s = s * adjust
+        s = np.clip(s, 0, 255).astype(hsv.dtype)
+        hsv = cv2.merge((h, s, v))
+        bgr = cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)
 
+        return bgr
 
 def test():
     from torch.utils.data import DataLoader
 
-    image_dir = '/home/lee/workspace/yolo_v1_pytorch/VOCdevkit/VOC2012/JPEGImages'
-    label_txt = '/home/lee/workspace/yolo_v1_pytorch/voc2012.txt'
+    image_dir = '/home/lee/workspace/vanila_yolo_v1_pytorch/VOC2012/JPEGImages'
+    label_txt = '/home/lee/workspace/vanila_yolo_v1_pytorch/voc2012.txt'
 
     dataset = VOCDataset(image_dir, label_txt)
     data_loader = DataLoader(dataset, batch_size=1, shuffle=False, num_workers=0)
@@ -182,7 +217,8 @@ def test():
     for i in range(10):
         img, target = next(data_iter)
         print(img.size(), target.size())
-        print(target[:,-3,4,:])
+        # img's shape must be N,C,H,W = (1, 3, 448, 448)
+        # target's size must be N,S,S,5*B+C = (1, 7, 7, 30)
 
 if __name__ == '__main__':
     test()

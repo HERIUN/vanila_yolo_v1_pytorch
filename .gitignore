@@ -1,5 +1,8 @@
 
 *.ipynb
+VOC2012/
+xml_parsing_test/
+tmp/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
