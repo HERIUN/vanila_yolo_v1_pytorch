@@ -16,56 +16,65 @@ class DarkNet(nn.Module):
 
     def forward(self, x):
         x = self.features(x)
-        if not self.conv_only:
-            x = self.fc(x)
+        x = self.fc(x)
         return x
 
-    def _make_conv_layers(self):
+    def _make_conv_layers(self): ## 20 Convs, used for pretrained by IMAGE Net 1000 class
         conv = nn.Sequential(
-            nn.Conv2d(3, 64, 7, stride=2, padding=3),
+            nn.Conv2d(in_channels=3, out_channels=64, kernel_size=7, stride=2, padding=3), # padding=3 so, output is 224.
             nn.LeakyReLU(0.1, inplace=True),
-            nn.MaxPool2d(2),
+            nn.MaxPool2d(kernel_size=2, stride=2),
 
             nn.Conv2d(64, 192, 3, padding=1),
             nn.LeakyReLU(0.1, inplace=True),
-            nn.MaxPool2d(2),
+            nn.MaxPool2d(2,2),
 
-            nn.Conv2d(192, 128, 1),
+            nn.Conv2d(192, 128, 1), ## kernel size = 1 이므로 padding = 0(defalut)
             nn.LeakyReLU(0.1, inplace=True),
-            nn.Conv2d(128, 256, 3, padding=1),
+
+            nn.Conv2d(128, 256, 3, padding=1), 
             nn.LeakyReLU(0.1, inplace=True),
+
             nn.Conv2d(256, 256, 1),
             nn.LeakyReLU(0.1, inplace=True),
-            nn.Conv2d(256, 512, 3, padding=1),
+
+            nn.Conv2d(256, 512, 3, padding=1), 
             nn.LeakyReLU(0.1, inplace=True),
-            nn.MaxPool2d(2),
+            nn.MaxPool2d(2,2),
 
             nn.Conv2d(512, 256, 1),
             nn.LeakyReLU(0.1, inplace=True),
-            nn.Conv2d(256, 512, 3, padding=1),
+
+            nn.Conv2d(256, 512, 3, padding=1), 
             nn.LeakyReLU(0.1, inplace=True),
+
             nn.Conv2d(512, 256, 1),
             nn.LeakyReLU(0.1, inplace=True),
-            nn.Conv2d(256, 512, 3, padding=1),
+
+            nn.Conv2d(256, 512, 3, padding=1), 
             nn.LeakyReLU(0.1, inplace=True),
+
             nn.Conv2d(512, 256, 1),
             nn.LeakyReLU(0.1, inplace=True),
-            nn.Conv2d(256, 512, 3, padding=1),
+            nn.Conv2d(256, 512, 3, padding=1), 
             nn.LeakyReLU(0.1, inplace=True),
+
             nn.Conv2d(512, 256, 1),
             nn.LeakyReLU(0.1, inplace=True),
-            nn.Conv2d(256, 512, 3, padding=1),
+            nn.Conv2d(256, 512, 3, padding=1), 
             nn.LeakyReLU(0.1, inplace=True),
+
             nn.Conv2d(512, 512, 1),
             nn.LeakyReLU(0.1, inplace=True),
-            nn.Conv2d(512, 1024, 3, padding=1),
+            nn.Conv2d(512, 1024, 3, padding=1), 
             nn.LeakyReLU(0.1, inplace=True),
-            nn.MaxPool2d(2),
+            nn.MaxPool2d(2,2),
 
             nn.Conv2d(1024, 512, 1),
             nn.LeakyReLU(0.1, inplace=True),
             nn.Conv2d(512, 1024, 3, padding=1),
             nn.LeakyReLU(0.1, inplace=True),
+
             nn.Conv2d(1024, 512, 1),
             nn.LeakyReLU(0.1, inplace=True),
             nn.Conv2d(512, 1024, 3, padding=1),
@@ -94,7 +103,7 @@ class DarkNet(nn.Module):
                 nn.init.normal_(m.weight, 0, 0.01)
                 nn.init.constant_(m.bias, 0)
 
-class Squeeze(nn.Module): ## 나중에 안쓰면 빼자.
+class Squeeze(nn.Module):
 
     def __init__(self):
         super(Squeeze, self).__init__()

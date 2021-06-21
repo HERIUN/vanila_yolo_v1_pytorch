@@ -1,5 +1,4 @@
 import torch
-from torch.nn.functional import cosine_embedding_loss
 from torch.utils.data import Dataset
 import torchvision.transforms as transforms
 
@@ -100,7 +99,7 @@ class VOCDataset(Dataset):
         
         for bi in range(boxes.size(0)):
             xy, wh, label = boxes_xy[bi], boxes_wh[bi], int(labels[bi])
-            ij = (xy / cell_size).ceil() - 1.0 # 해당 박스의 center가 어떤 grid에 속하는지 알아내기 위함. 1을 빼주는 이유는 index가 0부터 시작이므로
+            ij = (xy / cell_size).ceil() - 1.0 # 해당 박스의 center 좌표가 어떤 grid에 속하는지 알아내기 위함. 1을 빼주는 이유는 index가 0부터 시작이므로
             i, j = int(ij[0]), int(ij[1]) # grid index
             x0y0 = ij * cell_size # 해당 그리드의 왼쪽 상단의 좌표
             xy_normalized_grid = (xy - x0y0) / cell_size # 해당 그리드의 넓이,높이를 1로 쳤을때, center x,y의 좌표(0~1)
