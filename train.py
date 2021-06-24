@@ -5,7 +5,8 @@ import numpy as np
 import math
 
 from voc_dataset import VOCDataset
-from model import YOLOv1
+from darknet import DarkNet
+from yolo_v1 import YOLOv1
 from loss import Loss
 
 import os
@@ -17,15 +18,8 @@ classes = ['person', # Person
            'bottle', 'chair', 'dining table', 'potted plant', 'sofa', 'tv/monitor' # Indoor
            ]
 
-# annot_dir = '/home/lee/workspace/yolo_v1_pytorch/VOCdevkit/VOC2012/Annotations'
-
 image_dir = '/home/lee/workspace/yolo_v1_pytorch/VOC2012/JPEGImages'
 label_txt = '/home/lee/workspace/yolo_v1_pytorch/voc2012.txt'
-# convert_annot_dir = '/home/lee/workspace/yolo_v1_pytorch/voc_to_yolo '
-# class_names_file_dir = '/home/lee/workspace/yolo_v1_pytorch/voc.names'
-
-# voc_xml_to_txt_command = f"python3 voc_to_yolo.py --datasets VOC --img_path {image_dir} --label {annot_dir} --convert_output_path {convert_annot_dir} --img_type "".jpg"" --manifest_path ./ --cls_list_file {class_names_file_dir}"
-# os.system(voc_xml_to_txt_command)
 
 
 # Training hyper parameters.
@@ -58,7 +52,13 @@ def get_lr(optimizer):
         return param_group['lr']
 
 
-yolo = YOLOv1()
+# Load Pretrained Network
+cfg_path = "weight_cfg/extraction.conv.cfg"
+weight_path = "weight_cfg/extraction.conv.weights"
+darknet = DarkNet(cfg_path)
+darknet.load_weights(weight_path)
+
+yolo = YOLOv1(darknet)
 yolo.cuda()
 
 criterion = Loss()
@@ -66,7 +66,6 @@ optimizer = torch.optim.SGD(yolo.parameters(), lr=init_lr, momentum=momentum, we
 
 train_dataset = VOCDataset(image_dir, label_txt)
 train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=4)
-
 for epoch in range(1):
     
     yolo.train()

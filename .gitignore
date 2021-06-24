@@ -2,6 +2,7 @@
 VOC2012/
 xml_parsing_test/
 tmp/
+weight_cfg/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
