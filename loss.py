@@ -3,6 +3,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.autograd import Variable
 from torchvision.transforms.transforms import Normalize
+import matplotlib.pyplot as plt
+import numpy as np
 
 class Loss(nn.Module):
     def __init__(self, feature_size=7, num_bboxes=2, num_classes=20, lambda_coord=5.0, lambda_noobj=0.5):
@@ -173,9 +175,18 @@ def test():
     darknet.load_weights(weight_path)
     model = YOLOv1(darknet.features)
     model.cuda()
+
     
     loss = Loss()
-    data_iter = iter(data_loader)
+    # imgs, label = dataset[0][0], dataset[0][1] # torch.Size([3, 448, 448]), torch.Size([7, 7, 30])
+    imgs, label = next(iter(data_loader))  # torch.Size([1, 3, 448, 448]), torch.Size([1, 7, 7, 30])
+    plt.imshow(imgs.squeeze().permute(1,2,0))
+    imgs = imgs.float().cuda()
+    label = label.float().cuda()
+    pred = model(imgs)
+    L = loss(pred, label)
+    print(L)
+
 
 
 if __name__ == '__main__':
