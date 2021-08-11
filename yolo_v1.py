@@ -60,7 +60,7 @@ class YOLOv1(nn.Module):
 
         fp = open(weightfile, 'rb')
         weight = np.fromfile(fp, dtype=np.float32)
-        print(f"{weightfile} has {weight.size} weight & bias")
+        # print(f"{weightfile} has {weight.size} weight & bias")
         fp.close()
 
         ptr = 0
@@ -99,15 +99,16 @@ class Flatten(nn.Module):
         return x.view(x.size(0), -1)
 
 def test():
-    one_mini_batch = torch.rand(1, 3, 448, 448)
+    one_mini_batch = torch.rand(1, 3, 448, 448).cuda()
 
-    cfg_path = "/home/lee/workspace/vanila_yolo_v1_pytorch/weight_cfg/extraction.conv.cfg"
+    cfg_path = "/home/kang/workspace/vanila_yolo_v1_pytorch/weight_cfg/extraction.conv.cfg"
 
-    weight_path = "/home/lee/workspace/vanila_yolo_v1_pytorch/weight_cfg/extraction.conv.weights"
+    weight_path = "/home/kang/workspace/vanila_yolo_v1_pytorch/weight_cfg/extraction.conv.weights"
 
     darknet = DarkNet(cfg_path)
     darknet.load_weights(weight_path)
     yolo = YOLOv1(darknet.features)
+    yolo.cuda()
 
     print(yolo)
 

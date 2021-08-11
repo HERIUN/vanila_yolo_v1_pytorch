@@ -17,6 +17,9 @@ class VOCDataset(Dataset):
         self.C = num_classes
         self.to_tensor = transforms.ToTensor()
 
+        mean_rgb = [122.67891434, 116.66876762, 104.00698793]
+        self.mean = np.array(mean_rgb, dtype=np.float32)
+
         self.img_paths, self.boxes, self.labels = [], [], []
 
         with open(label_txt) as f:
@@ -48,6 +51,9 @@ class VOCDataset(Dataset):
         return self.num_samples
 
     def __getitem__(self, idx):
+        """
+            return img : shape(N, )
+        """
         path = self.img_paths[idx]
         img = cv2.imread(path) # (h, w, 3). 3 = (B,G,R)
         boxes = self.boxes[idx].clone() # [n, 4] ex. tensor([[x1, y1, x2, y2]_obj1])
@@ -59,22 +65,23 @@ class VOCDataset(Dataset):
         img = self.random_saturation(img)
 
         # For debug.
-        debug_dir = 'tmp/voc_tta'
-        os.makedirs(debug_dir, exist_ok=True)
-        img_show = img.copy()
-        box_show = boxes.numpy().reshape(-1)
-        n = len(box_show) // 4
-        for b in range(n):
-            pt1 = (int(box_show[4*b + 0]), int(box_show[4*b + 1]))
-            pt2 = (int(box_show[4*b + 2]), int(box_show[4*b + 3]))
-            cv2.rectangle(img_show, pt1=pt1, pt2=pt2, color=(0,255,0), thickness=1)
-        cv2.imwrite(os.path.join(debug_dir, 'test_{}.jpg'.format(idx)), img_show)
+        # debug_dir = 'tmp/voc_tta'
+        # os.makedirs(debug_dir, exist_ok=True)
+        # img_show = img.copy()
+        # box_show = boxes.numpy().reshape(-1)
+        # n = len(box_show) // 4
+        # for b in range(n):
+        #     pt1 = (int(box_show[4*b + 0]), int(box_show[4*b + 1]))
+        #     pt2 = (int(box_show[4*b + 2]), int(box_show[4*b + 3]))
+        #     cv2.rectangle(img_show, pt1=pt1, pt2=pt2, color=(0,255,0), thickness=1)
+        # cv2.imwrite(os.path.join(debug_dir, 'test_{}.jpg'.format(idx)), img_show)
 
         h, w, _ = img.shape
         boxes /= torch.Tensor([[w,h,w,h]])#.expand_as(boxes) # normalize(x1,y1,x2,y2) w.r.t. image width,height
-        target = self.encode(boxes, labels) # [S, S, 5 x B + C]
+        target = self.encode(boxes, labels) # [S, S, 5 x B + C] # B=(x,y,w,h,c) w.r.t (x,y)=>grid size. (w,h)=>image size
 
         img = cv2.resize(img, dsize=(self.image_size, self.image_size), interpolation=cv2.INTER_LINEAR)
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         img = img / 255.0 # normalize from 0 to 1
         img = self.to_tensor(img)
 
@@ -100,14 +107,14 @@ class VOCDataset(Dataset):
         for bi in range(boxes.size(0)):
             xy, wh, label = boxes_xy[bi], boxes_wh[bi], int(labels[bi])
             ij = (xy / cell_size).ceil() - 1.0 # 해당 박스의 center 좌표가 어떤 grid에 속하는지 알아내기 위함. 1을 빼주는 이유는 index가 0부터 시작이므로
-            i, j = int(ij[0]), int(ij[1]) # grid index
+            i, j = int(ij[0]), int(ij[1]) # y&x grid index
             x0y0 = ij * cell_size # 해당 그리드의 왼쪽 상단의 좌표
             xy_normalized_grid = (xy - x0y0) / cell_size # 해당 그리드의 넓이,높이를 1로 쳤을때, center x,y의 좌표(0~1)
             for k in range(B):
-                target[i, j, 5*k   : 5*k+2] = xy_normalized_grid
-                target[i, j, 5*k+2 : 5*k+4] = wh # check paper section 2.Unified Detection, 4th paragraph
-                target[i, j, 5*k+4        ] = 1.0 # confidence score. 물체가 있을 확률(Pr(Obj)) * IOU_truth/pred
-            target[i, j, 5*B + label      ] = 1.0 # class probability. Pr(Class_i|Object)
+                target[j, i, 5*k   : 5*k+2] = xy_normalized_grid
+                target[j, i, 5*k+2 : 5*k+4] = wh # check paper section 2.Unified Detection, 4th paragraph
+                target[j, i, 5*k+4        ] = 1.0 # confidence score. 물체가 있을 확률(Pr(Obj)) * IOU_truth/pred
+            target[j, i, 5*B + label      ] = 1.0 # class probability. Pr(Class_i|Object)
 
         return target
 

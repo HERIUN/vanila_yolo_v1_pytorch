@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.autograd import Variable
+from torchvision.transforms.transforms import Normalize
 
 class Loss(nn.Module):
     def __init__(self, feature_size=7, num_bboxes=2, num_classes=20, lambda_coord=5.0, lambda_noobj=0.5):
@@ -80,14 +81,13 @@ class Loss(nn.Module):
         noobj_mask = noobj_mask.unsqueeze(-1).expand_as(target_tensor) # [n_batch, S, S] -> [n_batch, S, S, 1] -> [n_batch, S, S, N]. obj가 없으면 true
 
         # pred tensor
+        # ncoord : number of the cells which contain objects
         coord_pred = pred_tensor[coord_mask].view(-1, N)        # [n_batch, S, S, N] -> [n_coord * N] -> [n_coord, N] 
-                                                                # ncoord : # of the cells which contain objects
         bbox_pred = coord_pred[:, :5*B].contiguous().view(-1,5) # [ncoord * B, 5]. 물체가 있는 그리드셀의 박스(좌표)정보
         class_pred = coord_pred[:, 5*B:]                        # [n_coord, C].    물체가 있는 그리드셀의 박스(클래스 확률)정보
 
         # target tensor
         coord_target = target_tensor[coord_mask].view(-1, N)        # target tensor on the cells which contain objects. [n_coord, N]
-                                                                    # n_coord: number of the cells which contain objects.
         bbox_target = coord_target[:, :5*B].contiguous().view(-1, 5)# [n_coord x B, 5=len([x, y, w, h, conf])]
         class_target = coord_target[:, 5*B:]                        # [n_coord, C]
 
@@ -95,12 +95,11 @@ class Loss(nn.Module):
         noobj_pred = pred_tensor[noobj_mask].view(-1, N)        # pred tensor on the cells which do not contain objects. [n_noobj, N]
                                                                 # n_noobj: number of the cells which do not contain objects.
         noobj_target = target_tensor[noobj_mask].view(-1, N)    # target tensor on the cells which do not contain objects. [n_noobj, N]
-        noobj_conf_mask = torch.cuda.BoolTensor(noobj_pred.size()).fill_(0) # [n_noobj, N] all zero
+        noobj_conf_mask = torch.cuda.BoolTensor(noobj_pred.size()).fill_(0) # [n_noobj, N] all zero, originally ByteTensor(noob_pred~~)
         for b in range(B):
             noobj_conf_mask[:, 4 + b*5] = 1 # noobj_conf_mask[:, 4] = 1; noobj_conf_mask[:, 9] = 1
-        noobj_pred_conf = noobj_pred[noobj_conf_mask]       # [n_noobj, 2=len([conf1, conf2])]
-        noobj_target_conf = noobj_target[noobj_conf_mask]   # [n_noobj, 2=len([conf1, conf2])]
-        
+        noobj_pred_conf = noobj_pred[noobj_conf_mask]       # [n_noobj*2=len([conf1, conf2])]
+        noobj_target_conf = noobj_target[noobj_conf_mask]   # [n_noobj*2=len([conf1, conf2])]
         loss_noobj = F.mse_loss(noobj_pred_conf, noobj_target_conf, reduction='sum')
 
         # Compute loss for the cells with objects.
@@ -112,15 +111,15 @@ class Loss(nn.Module):
         for i in range(0, bbox_target.size(0), B):
             pred = bbox_pred[i:i+B] # predicted bboxes at i-th cell, [B, 5=len([x, y, w, h, conf])]
             pred_xyxy = Variable(torch.FloatTensor(pred.size())) # [B, 5=len([x1, y1, x2, y2, conf])]
-            # Because (center_x,center_y)=pred[:, 2] and (w,h)=pred[:,2:4] are normalized for cell-size and image-size respectively,
+            # Because (center_x,center_y)=pred[:,:2] and (w,h)=pred[:,2:4] are normalized for cell-size and image-size respectively,
             # rescale (center_x,center_y) for the image-size to compute IoU correctly.
             pred_xyxy[:,  :2] = pred[:, :2]/float(S) - 0.5 * pred[:, 2:4]
             pred_xyxy[:, 2:4] = pred[:, :2]/float(S) + 0.5 * pred[:, 2:4]
 
             target = bbox_target[i] # target bbox at i-th cell. Because target boxes contained by each cell are identical in current implementation, enough to extract the first one.
-            target = bbox_target[i].view(-1, 5) # target bbox at i-th cell, [1, 5=len([x, y, w, h, conf])]
+            target = bbox_target[i].view(-1, 5) # target bbox at i-th cell, [1, 5=len([x1, y1, x2, y2, conf])]
             target_xyxy = Variable(torch.FloatTensor(target.size())) # [1, 5=len([x1, y1, x2, y2, conf])]
-            # Because (center_x,center_y)=target[:, 2] and (w,h)=target[:,2:4] are normalized for cell-size and image-size respectively,
+            # Because (center_x,center_y)=target[:,:2] and (w,h)=target[:,2:4] are normalized for cell-size and image-size respectively,
             # rescale (center_x,center_y) for the image-size to compute IoU correctly.
             target_xyxy[:,  :2] = target[:, :2]/float(S) - 0.5 * target[:, 2:4]
             target_xyxy[:, 2:4] = target[:, :2]/float(S) + 0.5 * target[:, 2:4]
@@ -154,3 +153,30 @@ class Loss(nn.Module):
 
         return loss
 
+def test():
+    from torch.utils.data import DataLoader
+    from voc_dataset import VOCDataset
+    from yolo_v1 import YOLOv1
+    from darknet import DarkNet
+    import cv2
+
+    img_dir = '/home/kang/workspace/vanila_yolo_v1_pytorch/VOC2007/JPEGImages'
+    label_txt = '/home/kang/workspace/vanila_yolo_v1_pytorch/voc2007.txt'
+    
+    dataset = VOCDataset(img_dir, label_txt)
+    data_loader = DataLoader(dataset, batch_size=1, shuffle=False, num_workers=0)
+
+    cfg_path = "/home/kang/workspace/vanila_yolo_v1_pytorch/weight_cfg/extraction.conv.cfg"
+    weight_path = "/home/kang/workspace/vanila_yolo_v1_pytorch/weight_cfg/extraction.conv.weights"
+
+    darknet = DarkNet(cfg_path)
+    darknet.load_weights(weight_path)
+    model = YOLOv1(darknet.features)
+    model.cuda()
+    
+    loss = Loss()
+    data_iter = iter(data_loader)
+
+
+if __name__ == '__main__':
+    test()

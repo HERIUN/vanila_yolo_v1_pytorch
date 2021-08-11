@@ -25,6 +25,9 @@ class DarkNet(nn.Module):
         return x
     
     def create_features(self, cfg_path):
+        """
+            get "extraction.conv.cfg" and covert to torch.nn
+        """
         def parse_cfg(cfg_path):
             blocks = []
             fp = open(cfg_path, 'r')

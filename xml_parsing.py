@@ -9,8 +9,8 @@ VOC_CLASSES = (    # always index 0
     'sheep', 'sofa', 'train', 'tvmonitor')
 
 
-txt_file = open('result.txt', 'w')
-Annotations_dir = '/home/lee/workspace/vanila_yolo_v1_pytorch/xml_parsing_test/'
+txt_file = open('voc2007.txt', 'w')
+Annotations_dir = '/home/kang/workspace/vanila_yolo_v1_pytorch/VOC2007/Annotations/'
 xml_files = os.listdir(Annotations_dir)
 
 def parse_rec(filename):

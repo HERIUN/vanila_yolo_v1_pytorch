@@ -1,8 +1,11 @@
 *.ipynb
 VOC2012/
+VOC2007/
 xml_parsing_test/
 tmp/
 weight_cfg/
+results/
+wandb/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
